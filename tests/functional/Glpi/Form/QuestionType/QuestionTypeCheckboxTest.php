@@ -1,0 +1,102 @@
+<?php
+
+/**
+ * ---------------------------------------------------------------------
+ *
+ * GLPI - Gestionnaire Libre de Parc Informatique
+ *
+ * http://glpi-project.org
+ *
+ * @copyright 2015-2026 Teclib' and contributors.
+ * @licence   https://www.gnu.org/licenses/gpl-3.0.html
+ *
+ * ---------------------------------------------------------------------
+ *
+ * LICENSE
+ *
+ * This file is part of GLPI.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * ---------------------------------------------------------------------
+ */
+
+namespace tests\units\Glpi\Form\QuestionType;
+
+use Glpi\Form\Question;
+use Glpi\Form\QuestionType\AbstractQuestionTypeSelectable;
+use Glpi\Form\QuestionType\QuestionTypeCheckbox;
+use Glpi\Form\QuestionType\QuestionTypeSelectableExtraDataConfig;
+use Glpi\Tests\Form\QuestionType\AbstractQuestionTypeSelectableTest;
+use Glpi\Tests\FormBuilder;
+use Override;
+
+final class QuestionTypeCheckboxTest extends AbstractQuestionTypeSelectableTest
+{
+    #[Override]
+    protected function getQuestionType(): AbstractQuestionTypeSelectable
+    {
+        return new QuestionTypeCheckbox();
+    }
+
+    public function testCheckboxAnswerIsDisplayedInTicketDescription(): void
+    {
+        $builder = new FormBuilder();
+        $builder->addQuestion(
+            name: "Shopping list",
+            type: QuestionTypeCheckbox::class,
+            extra_data: json_encode(new QuestionTypeSelectableExtraDataConfig([
+                'bread'  => 'Bread',
+                'milk'   => 'Milk',
+                'cheese' => 'Cheese',
+                'eggs'   => 'Eggs',
+                'butter' => 'Butter',
+            ]))
+        );
+        $form = $this->createForm($builder);
+
+        $ticket = $this->sendFormAndGetCreatedTicket($form, [
+            "Shopping list" => ['bread', 'milk', 'cheese'],
+        ]);
+
+        $this->assertStringContainsString(
+            "1) Shopping list: Bread, Milk, Cheese",
+            strip_tags($ticket->fields['content']),
+        );
+    }
+
+    public function testMultiplePredefinedValuesAreApplied(): void
+    {
+        $builder = new FormBuilder();
+        $builder->addQuestion(
+            name: "Shopping list",
+            type: QuestionTypeCheckbox::class,
+            default_value: 'bread',
+            extra_data: json_encode(new QuestionTypeSelectableExtraDataConfig([
+                'bread'  => 'Bread',
+                'milk'   => 'Milk',
+                'cheese' => 'Cheese',
+            ]))
+        );
+        $form = $this->createForm($builder);
+        $question = Question::getById($this->getQuestionId($form, "Shopping list"));
+
+        $question->setDefaultValueFromParameters([
+            $question->fields['uuid'] => 'milk,cheese',
+        ]);
+
+        // A checkbox question holds several values, the parameter is valid
+        $this->assertEquals('milk,cheese', $question->fields['default_value']);
+    }
+}

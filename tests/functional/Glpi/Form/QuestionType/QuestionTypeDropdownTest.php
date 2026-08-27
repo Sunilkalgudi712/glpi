@@ -1,0 +1,228 @@
+<?php
+
+/**
+ * ---------------------------------------------------------------------
+ *
+ * GLPI - Gestionnaire Libre de Parc Informatique
+ *
+ * http://glpi-project.org
+ *
+ * @copyright 2015-2026 Teclib' and contributors.
+ * @licence   https://www.gnu.org/licenses/gpl-3.0.html
+ *
+ * ---------------------------------------------------------------------
+ *
+ * LICENSE
+ *
+ * This file is part of GLPI.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * ---------------------------------------------------------------------
+ */
+
+namespace tests\units\Glpi\Form\QuestionType;
+
+use Glpi\Form\Question;
+use Glpi\Form\QuestionType\AbstractQuestionTypeSelectable;
+use Glpi\Form\QuestionType\QuestionTypeDropdown;
+use Glpi\Form\QuestionType\QuestionTypeDropdownExtraDataConfig;
+use Glpi\Tests\Form\QuestionType\AbstractQuestionTypeSelectableTest;
+use Glpi\Tests\FormBuilder;
+use Override;
+
+final class QuestionTypeDropdownTest extends AbstractQuestionTypeSelectableTest
+{
+    #[Override]
+    protected function getQuestionType(): AbstractQuestionTypeSelectable
+    {
+        return new QuestionTypeDropdown();
+    }
+
+    public function testSingleValueDropdownAnswerIsDisplayedInTicketDescription(): void
+    {
+        $builder = new FormBuilder();
+        $builder->addQuestion(
+            name: "Your favorite color",
+            type: QuestionTypeDropdown::class,
+            extra_data: json_encode(new QuestionTypeDropdownExtraDataConfig([
+                'blue'   => 'Blue',
+                'green'  => 'Green',
+                'red'    => 'Red',
+                'yellow' => 'Yellow',
+                'black'  => 'Black',
+            ]))
+        );
+        $form = $this->createForm($builder);
+
+        $ticket = $this->sendFormAndGetCreatedTicket($form, [
+            "Your favorite color" => ['red'],
+        ]);
+
+        $this->assertStringContainsString(
+            "1) Your favorite color: Red",
+            strip_tags($ticket->fields['content']),
+        );
+    }
+
+    public function testMultipleValuesDropdownAnswerAreDisplayedInTicketDescription(): void
+    {
+        $builder = new FormBuilder();
+        $builder->addQuestion(
+            name: "Your favorite colors",
+            type: QuestionTypeDropdown::class,
+            extra_data: json_encode(new QuestionTypeDropdownExtraDataConfig([
+                'blue'   => 'Blue',
+                'green'  => 'Green',
+                'red'    => 'Red',
+                'yellow' => 'Yellow',
+                'black'  => 'Black',
+            ], is_multiple_dropdown: true))
+        );
+        $form = $this->createForm($builder);
+
+        $ticket = $this->sendFormAndGetCreatedTicket($form, [
+            "Your favorite colors" => ['red', 'yellow'],
+        ]);
+
+        $this->assertStringContainsString(
+            "1) Your favorite colors: Red, Yellow",
+            strip_tags($ticket->fields['content']),
+        );
+    }
+
+    public function testMultipleDropdownWithMoreThan50OptionsRendersSelectWithArrayName(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 51,
+            is_multiple: true,
+        );
+
+        $html = (new QuestionTypeDropdown())->renderEndUserTemplate($question);
+
+        $input_name = $question->getEndUserInputName();
+        $this->assertStringContainsString(
+            sprintf('name="%s[]"', $input_name),
+            $html,
+            'Multiple dropdown with >50 options must use array name (answers_X[]) so all selected values are submitted and the condition engine receives an array'
+        );
+        $this->assertMatchesRegularExpression('/<select[^>]+\bmultiple\b/', $html);
+        $this->assertStringContainsString('DropdownValues', $html, 'Should use the AJAX template');
+    }
+
+    public function testSingleDropdownWithMoreThan50OptionsRendersSelectWithoutArrayName(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 51,
+            is_multiple: false,
+        );
+
+        $html = (new QuestionTypeDropdown())->renderEndUserTemplate($question);
+
+        $input_name = $question->getEndUserInputName();
+        $this->assertStringContainsString(
+            sprintf('name="%s"', $input_name),
+            $html,
+        );
+        $this->assertStringNotContainsString(
+            sprintf('name="%s[]"', $input_name),
+            $html,
+        );
+        $this->assertStringContainsString('DropdownValues', $html, 'Should use the AJAX template');
+    }
+
+    public function testDropdownWithAtMost50OptionsRendersStandardTemplate(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 50,
+            is_multiple: true,
+        );
+
+        $html = (new QuestionTypeDropdown())->renderEndUserTemplate($question);
+
+        $this->assertStringNotContainsString('DropdownValues', $html, 'Should use the standard template, not AJAX');
+    }
+
+    public function testMultiplePredefinedValuesAreIgnoredOnSingleDropdown(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 3,
+            is_multiple: false,
+            default_value: 'option_1',
+        );
+
+        $question->setDefaultValueFromParameters([
+            $question->fields['uuid'] => 'option_2,option_3',
+        ]);
+
+        // A single dropdown can only hold a single value: the ambiguous
+        // parameter must be discarded and the configured default preserved.
+        $this->assertEquals('option_1', $question->fields['default_value']);
+    }
+
+    public function testMultiplePredefinedValuesAreAppliedOnMultipleDropdown(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 3,
+            is_multiple: true,
+            default_value: 'option_1',
+        );
+
+        $question->setDefaultValueFromParameters([
+            $question->fields['uuid'] => 'option_2,option_3',
+        ]);
+
+        $this->assertEquals('option_2,option_3', $question->fields['default_value']);
+    }
+
+    public function testSinglePredefinedValueIsAppliedOnSingleDropdown(): void
+    {
+        $question = $this->createDropdownQuestion(
+            option_count: 3,
+            is_multiple: false,
+            default_value: 'option_1',
+        );
+
+        $question->setDefaultValueFromParameters([
+            $question->fields['uuid'] => 'option_3',
+        ]);
+
+        $this->assertEquals('option_3', $question->fields['default_value']);
+    }
+
+    private function createDropdownQuestion(
+        int $option_count,
+        bool $is_multiple,
+        string $default_value = "",
+    ): Question {
+        $options = [];
+        for ($i = 1; $i <= $option_count; $i++) {
+            $options["option_$i"] = "Option $i";
+        }
+
+        $builder = new FormBuilder();
+        $builder->addQuestion(
+            name: "Pick options",
+            type: QuestionTypeDropdown::class,
+            default_value: $default_value,
+            extra_data: json_encode(new QuestionTypeDropdownExtraDataConfig(
+                options: $options,
+                is_multiple_dropdown: $is_multiple,
+            ))
+        );
+        $form = $this->createForm($builder);
+
+        return Question::getById($this->getQuestionId($form, "Pick options"));
+    }
+}
