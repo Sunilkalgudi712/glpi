@@ -132,17 +132,36 @@ if (!empty($searchQuery) && isset($pdo)) {
                     break;
             }
 
-            // Public technician followups only (is_private = 0)
-            $fupStmt = $pdo->prepare("SELECT date_creation, content FROM glpi_itilfollowups 
-                WHERE items_id = ? AND itemtype = 'Ticket' AND is_private = 0 
-                ORDER BY id ASC");
-            $fupStmt->execute([$row['id']]);
-            $publicUpdates = $fupStmt->fetchAll();
+            $custName = '';
+            if (!empty($row['content']) && preg_match('/(?:Customer Name:\s*<\/strong>|\*\*Customer Name:\*\*)\s*([^\r\n<]+)/i', $row['content'], $mCName)) {
+                $custName = trim(strip_tags($mCName[1]));
+            }
+            if (empty($custName)) {
+                try {
+                    $reStmt = $pdo->prepare("SELECT customer_name FROM glpi_plugin_repairenhancer_tickets WHERE tickets_id = ? LIMIT 1");
+                    $reStmt->execute([$row['id']]);
+                    $reRow = $reStmt->fetch();
+                    if ($reRow && !empty($reRow['customer_name'])) {
+                        $custName = $reRow['customer_name'];
+                    }
+                } catch (Exception $e) {}
+            }
+            if (empty($custName) && !empty($row['users_id_recipient'])) {
+                try {
+                    $uStmt = $pdo->prepare("SELECT realname, name, firstname FROM glpi_users WHERE id = ? LIMIT 1");
+                    $uStmt->execute([$row['users_id_recipient']]);
+                    $uRow = $uStmt->fetch();
+                    if ($uRow) {
+                        $custName = trim(($uRow['firstname'] ?? '') . ' ' . ($uRow['realname'] ?? '')) ?: $uRow['name'];
+                    }
+                } catch (Exception $e) {}
+            }
 
             $searchResults[] = [
                 'id'             => $row['id'],
                 'job_number'     => "#JOB-" . $row['id'],
                 'name'           => $row['name'],
+                'customer_name'  => $custName,
                 'status_code'    => $statusCode,
                 'status_label'   => $statusLabel,
                 'status_badge'   => $statusBadge,
@@ -366,12 +385,24 @@ if (!empty($searchQuery) && isset($pdo)) {
                                 </div>
 
                                 <div class="row g-2 small mb-3 text-muted">
+                                    <?php if (!empty($job['customer_name'])): ?>
+                                    <div class="col-sm-4">
+                                        <strong>Customer:</strong> <span class="text-dark fw-bold"><?= htmlspecialchars($job['customer_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <strong>Service Category:</strong> <?= htmlspecialchars($job['category'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <strong>Intake Date:</strong> <?= htmlspecialchars($job['date_creation'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                    <?php else: ?>
                                     <div class="col-sm-6">
                                         <strong>Service Category:</strong> <?= htmlspecialchars($job['category'], ENT_QUOTES, 'UTF-8') ?>
                                     </div>
                                     <div class="col-sm-6">
                                         <strong>Intake Date:</strong> <?= htmlspecialchars($job['date_creation'], ENT_QUOTES, 'UTF-8') ?>
                                     </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <?php if (!empty($job['updates'])): ?>

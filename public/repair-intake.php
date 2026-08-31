@@ -109,17 +109,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_intake']) && i
                             "<strong>Issue Title:</strong> " . htmlspecialchars($issueTitle, ENT_QUOTES, 'UTF-8') . "<br><br>" .
                             "<strong>Detailed Fault Description:</strong><br>" . nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8'));
 
-        $initialTitle = "[JOB] " . $laptopModel . " - " . $issueTitle;
+        $initialTitle = "[JOB] " . $laptopModel . " - " . $issueTitle . " (" . $customerName . ")";
 
         try {
+            // Find or Create Customer User in GLPI
+            $userId = 0;
+            $userLookup = $pdo->prepare("SELECT id FROM glpi_users WHERE phone = ? OR name = ? LIMIT 1");
+            $userLookup->execute([$cleanPhone, $cleanPhone]);
+            $uRow = $userLookup->fetch();
+            if ($uRow) {
+                $userId = (int)$uRow['id'];
+                // Update realname if needed
+                $uUpdate = $pdo->prepare("UPDATE glpi_users SET realname = ?, phone = ? WHERE id = ?");
+                $uUpdate->execute([$customerName, $phoneNumber, $userId]);
+            } else {
+                $uInsert = $pdo->prepare("INSERT INTO glpi_users (name, realname, phone, is_active, entities_id, profiles_id, date_mod, date_creation) VALUES (?, ?, ?, 1, 0, 1, NOW(), NOW())");
+                $uInsert->execute([$cleanPhone, $customerName, $phoneNumber]);
+                $userId = (int)$pdo->lastInsertId();
+            }
+
             $insertSql = "INSERT INTO glpi_tickets (
                 entities_id, name, date, date_mod, date_creation,
                 status, content, urgency, impact, priority,
-                itilcategories_id, type, externalid, is_deleted
+                itilcategories_id, type, externalid, users_id_recipient, is_deleted
             ) VALUES (
                 0, :name, NOW(), NOW(), NOW(),
                 1, :content, 3, 3, 3,
-                :cat_id, 1, :externalid, 0
+                :cat_id, 1, :externalid, :user_id, 0
             )";
 
             $stmt = $pdo->prepare($insertSql);
@@ -128,15 +144,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_intake']) && i
                 ':content'    => $formattedContent,
                 ':cat_id'     => $categoryId,
                 ':externalid' => $cleanPhone,
+                ':user_id'    => $userId,
             ]);
 
             $ticketId = (int)$pdo->lastInsertId();
 
             if ($ticketId > 0) {
-                // Update final Job Title with unique ID
-                $finalTitle = "[JOB-{$ticketId}] " . $laptopModel . " - " . $issueTitle;
+                // Update final Job Title with unique ID and Customer Name
+                $finalTitle = "[JOB-{$ticketId}] " . $laptopModel . " - " . $issueTitle . " (" . $customerName . ")";
                 $updateStmt = $pdo->prepare("UPDATE glpi_tickets SET name = ? WHERE id = ?");
                 $updateStmt->execute([$finalTitle, $ticketId]);
+
+                // Insert Requester Actor in glpi_tickets_users
+                if ($userId > 0) {
+                    $tuStmt = $pdo->prepare("INSERT INTO glpi_tickets_users (tickets_id, users_id, type, use_notification) VALUES (?, ?, 1, 1)");
+                    $tuStmt->execute([$ticketId, $userId]);
+                }
+
+                // Insert into glpi_plugin_repairenhancer_tickets
+                try {
+                    $trackingToken = bin2hex(random_bytes(32));
+                    $reStmt = $pdo->prepare("INSERT INTO glpi_plugin_repairenhancer_tickets (
+                        tickets_id, customer_name, device_type, device_model,
+                        device_imei, device_condition, customer_phone,
+                        estimated_cost, advance_deposit, tracking_token
+                    ) VALUES (
+                        :ticket_id, :c_name, 'Laptop', :model,
+                        :imei, 'Standard Intake', :phone,
+                        0.00, 0.00, :token
+                    ) ON DUPLICATE KEY UPDATE customer_name = VALUES(customer_name), customer_phone = VALUES(customer_phone)");
+                    $reStmt->execute([
+                        ':ticket_id' => $ticketId,
+                        ':c_name'    => $customerName,
+                        ':model'     => $laptopModel,
+                        ':imei'      => $serialDisplay,
+                        ':phone'     => $phoneNumber,
+                        ':token'     => $trackingToken,
+                    ]);
+                } catch (Exception $reEx) {
+                    // Ignore plugin table error if table missing
+                }
 
                 // Insert initial public intake note
                 $fupSql = "INSERT INTO glpi_itilfollowups (
