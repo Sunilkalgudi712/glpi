@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "df2a0e5c8613f3075b7f7971ba8c5902",
+    "content-hash": "743cf97e14c27cdd27317199065e699e",
     "packages": [
         {
             "name": "altcha-org/altcha",
@@ -9183,16 +9183,16 @@
         },
         {
             "name": "twig/markdown-extra",
-            "version": "v3.26.0",
+            "version": "v3.28.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/twigphp/markdown-extra.git",
-                "reference": "e3f3fd0836eb6c39457da22c8a76abaac62692b9"
+                "reference": "5f7b27e41a382fc988fffa6e588d8f9d55b9d896"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/twigphp/markdown-extra/zipball/e3f3fd0836eb6c39457da22c8a76abaac62692b9",
-                "reference": "e3f3fd0836eb6c39457da22c8a76abaac62692b9",
+                "url": "https://api.github.com/repos/twigphp/markdown-extra/zipball/5f7b27e41a382fc988fffa6e588d8f9d55b9d896",
+                "reference": "5f7b27e41a382fc988fffa6e588d8f9d55b9d896",
                 "shasum": ""
             },
             "require": {
@@ -9239,7 +9239,7 @@
                 "twig"
             ],
             "support": {
-                "source": "https://github.com/twigphp/markdown-extra/tree/v3.26.0"
+                "source": "https://github.com/twigphp/markdown-extra/tree/v3.28.0"
             },
             "funding": [
                 {
@@ -9251,25 +9251,25 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-15T13:14:02+00:00"
+            "time": "2026-06-05T19:47:22+00:00"
         },
         {
             "name": "twig/string-extra",
-            "version": "v3.21.0",
+            "version": "v3.24.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/twigphp/string-extra.git",
-                "reference": "4b3337544ac8f76c280def94e32b53acfaec0589"
+                "reference": "6ec8f2e8ca9b2193221a02cb599dc92c36384368"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/twigphp/string-extra/zipball/4b3337544ac8f76c280def94e32b53acfaec0589",
-                "reference": "4b3337544ac8f76c280def94e32b53acfaec0589",
+                "url": "https://api.github.com/repos/twigphp/string-extra/zipball/6ec8f2e8ca9b2193221a02cb599dc92c36384368",
+                "reference": "6ec8f2e8ca9b2193221a02cb599dc92c36384368",
                 "shasum": ""
             },
             "require": {
                 "php": ">=8.1.0",
-                "symfony/string": "^5.4|^6.4|^7.0",
+                "symfony/string": "^5.4|^6.4|^7.0|^8.0",
                 "symfony/translation-contracts": "^1.1|^2|^3",
                 "twig/twig": "^3.13|^4.0"
             },
@@ -9306,7 +9306,7 @@
                 "unicode"
             ],
             "support": {
-                "source": "https://github.com/twigphp/string-extra/tree/v3.21.0"
+                "source": "https://github.com/twigphp/string-extra/tree/v3.24.0"
             },
             "funding": [
                 {
@@ -9318,7 +9318,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-01-31T20:45:36+00:00"
+            "time": "2025-12-02T14:45:16+00:00"
         },
         {
             "name": "twig/twig",
